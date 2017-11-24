@@ -103,6 +103,6 @@ public class ktest
 		
 		int kAnonymity = dataset.calculateKAnonymity();
 		System.out.println("K-anonymity of this dataset is : " + kAnonymity);
-		//return kAnonymity;
+		System.exit(kAnonymity);
 	}
 }
