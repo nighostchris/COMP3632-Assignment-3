@@ -41,12 +41,12 @@ public class kanon
 	private ArrayList<Dataset> input;
 	private int dpTable[][];
 	
-	public kanon(String fileName)
+	public kanon(String fileName, int anonymity)
 	{
 		input = new ArrayList<Dataset>();
 		File sourceFile = new File(fileName);
 		inputDataFile(sourceFile);
-		dpTable = new int[input.size()][4];
+		dpTable = new int[input.size()][anonymity];
 	}
 	
 	private void inputDataFile(File sourceFile)
@@ -79,19 +79,19 @@ public class kanon
 	}
 	
 	private int medianOfDataset(ArrayList<Dataset> d) 
-	{
+	{	
 		// perform sorting on d first
 		Collections.sort(d);
 		// find out the median
 		if (d.size() % 2 == 0)
 		{
 			int half = d.size() / 2;
-			return (int)((d.get(half).getQID() + d.get(half + 1).getQID()) / 2);
+			return (int)((d.get(half - 1).getQID() + d.get(half).getQID()) / 2);
 		}
 		else
 		{
 			int half = (d.size() + 1) / 2;
-			return d.get(half).getQID();
+			return d.get(half - 1).getQID();
 		}
 	}
 	
@@ -103,29 +103,75 @@ public class kanon
 		return change;
 	}
 	
-	private void constructDPTable(ArrayList<Dataset> d)
+	private int min(ArrayList<Integer> d)
 	{
-		// x-coor, height of dpTable
+		int min = d.get(0);
+		for (Integer integer : d)
+		{
+			if (integer < min)
+				min = integer;
+		}
+		return min;
+	}
+	
+	private void printDPTable()
+	{
+		for (int i = 0; i < dpTable.length; i++)
+		{
+			for (int j = 0; j < dpTable[0].length; j++)
+			{
+				System.out.print(dpTable[i][j] + "   ");
+			}
+			System.out.println();
+		}
+	}
+	
+	private void constructDPTable(ArrayList<Dataset> d, int anonymity)
+	{
+		// x-coor, width of dpTable
 		for (int i = 0; i < dpTable[0].length; i++)
 		{
-			// y-coor, width of dpTable
+			// y-coor, height of dpTable
 			for (int j = 0; j < dpTable.length; j++)
 			{
 				// No need to compute DP for those lower than value of kanonymity
-				if (j < 4)
-				{
-					dpTable[i][j] = -1;
-				}
+				if (j < anonymity - 1)
+					dpTable[j][i] = -1;
 				else
 				{
-					// Get the data to process
-					ArrayList<Dataset> tempSet = new ArrayList<Dataset>();
-					for (int k = 0; k < j; k++)
-						tempSet.add(d.get(k));
-					// Get the median of the dataset
-					int median = medianOfDataset(d);
-					// Get the minimal change of the dataset
-					dpTable[i][j] = changeOfDataset(tempSet, median);
+					if (i == 0) // C(i, 1)
+					{
+						// Get the data to process
+						ArrayList<Dataset> tempSet = new ArrayList<Dataset>();
+						for (int k = 0; k <= j; k++)
+							tempSet.add(d.get(k));
+						// Get the median of the dataset
+						int median = medianOfDataset(tempSet);
+						// Get the minimal change of the dataset
+						dpTable[j][i] = changeOfDataset(tempSet, median);
+					}
+					else // C(i, 2) or C(i, 3)
+					{
+						if (j + 1 < (anonymity * 2)) 			// no of element smaller than double of k-anonymity
+							dpTable[j][i] = dpTable[j][i - 1];  // just equal to last calculation
+						else
+						{
+							ArrayList<Integer> tempSet = new ArrayList<Integer>();
+							// put all elements into all previous set
+							tempSet.add(dpTable[j][i - 1]);
+							// consider all possibilities that can split sets
+							for (int k = anonymity; k <= j + 1 - anonymity; k++)
+							{
+								ArrayList<Dataset> temp = new ArrayList<Dataset>();
+								for (int l = k; l < j + 1; l++)
+									temp.add(d.get(l));
+								// C(i - ?, 1) + A(i - ?)
+								tempSet.add(dpTable[k - 1][i - 1] + changeOfDataset(temp, medianOfDataset(temp)));
+							}
+							// calculate minimum change of the set of dataset
+							dpTable[j][i] = min(tempSet);
+						}
+					}
 				}
 			}
 		}
@@ -133,8 +179,9 @@ public class kanon
 	
 	public static void main(String[] args)
 	{
-		kanon dataset = new kanon(args[0]);
+		kanon dataset = new kanon(args[0], 4);
 		ArrayList<Dataset> clonedSet = dataset.cloneAndSort();
-		dataset.constructDPTable(clonedSet);
+		dataset.constructDPTable(clonedSet, 4);
+		dataset.printDPTable();
 	}
 }
