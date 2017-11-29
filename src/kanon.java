@@ -56,8 +56,9 @@ public class kanon
 		input = new ArrayList<Dataset>();
 		File sourceFile = new File(fileName);
 		inputDataFile(sourceFile);
-		dpTable = new int[input.size()][anonymity];
-		setTable = new ArrayList[input.size()][anonymity];
+		int width = (int)Math.floor(input.size() / anonymity); 
+		dpTable = new int[input.size()][width];
+		setTable = new ArrayList[input.size()][width];
 	}
 	
 	private void inputDataFile(File sourceFile)
@@ -238,7 +239,7 @@ public class kanon
 								t.add(temp);
 								tempSetTable.add(t);
 							}
-							
+						
 							// Get the minimum change of the set of datasets
 							dpTable[j][i] = min(tempSet);
 							
@@ -313,8 +314,6 @@ public class kanon
 		kanon dataset = new kanon(args[0], 4);
 		dataset.printInput();
 		ArrayList<Dataset> clonedSet = dataset.cloneAndSort();
-		//for (Dataset print : clonedSet)
-		//	System.out.println(print);
 		dataset.constructDPTable(clonedSet, 4);
 		dataset.printDPTable();
 		dataset.printSetTable();
