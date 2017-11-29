@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Scanner;
 import java.io.File;
+import java.io.PrintWriter;
 
 class Dataset implements Comparable<Dataset>
 {
@@ -24,6 +25,8 @@ class Dataset implements Comparable<Dataset>
 	
 	public int getSensitiveAttribute() { return sensitiveAttribute; }
 	
+	public void setQID(int QID) { this.QID = QID; }
+	
 	@Override
 	public int compareTo(Dataset o)
 	{
@@ -34,12 +37,19 @@ class Dataset implements Comparable<Dataset>
 		else
 			return -1;
 	}
+	
+	@Override
+	public String toString()
+	{
+		return QID + "," + sensitiveAttribute;
+	}
 }
 
 public class kanon 
 {
 	private ArrayList<Dataset> input;
 	private int dpTable[][];
+	private ArrayList<ArrayList<Dataset>> setTable[][];
 	
 	public kanon(String fileName, int anonymity)
 	{
@@ -47,6 +57,7 @@ public class kanon
 		File sourceFile = new File(fileName);
 		inputDataFile(sourceFile);
 		dpTable = new int[input.size()][anonymity];
+		setTable = new ArrayList[input.size()][anonymity];
 	}
 	
 	private void inputDataFile(File sourceFile)
@@ -86,7 +97,7 @@ public class kanon
 		if (d.size() % 2 == 0)
 		{
 			int half = d.size() / 2;
-			return (int)((d.get(half - 1).getQID() + d.get(half).getQID()) / 2);
+			return (int)((d.get(half - 1).getQID() + d.get(half).getQID()) / 2) + 1;
 		}
 		else
 		{
@@ -116,11 +127,41 @@ public class kanon
 	
 	private void printDPTable()
 	{
+		System.out.println("Dynamic Programming Table of the input file : ");
 		for (int i = 0; i < dpTable.length; i++)
 		{
 			for (int j = 0; j < dpTable[0].length; j++)
 			{
 				System.out.print(dpTable[i][j] + "   ");
+			}
+			System.out.println();
+		}
+	}
+	
+	private void printSetTable()
+	{
+		System.out.println("Set Table of the input file : " + setTable.length + " " + setTable[0].length);
+		for (int j = 0; j < setTable[0].length; j++)
+		{
+			for (int i = 0; i < setTable.length; i++)
+			{
+				System.out.print("i: " + (i + 1) + " j: " + (j + 1) + " [");
+				for (ArrayList<Dataset> print : setTable[i][j])
+				{
+					System.out.print("[");
+					for (int l = 0; l < print.size(); l++)
+					{
+						if (l == 0)
+							System.out.print(print.get(l).getQID());
+						else
+							System.out.print(", " + print.get(l).getQID());
+					}
+					if (print == setTable[i][j].get(setTable[i][j].size() - 1))
+						System.out.print("]");
+					else
+						System.out.print("], ");
+				}
+				System.out.println("]");
 			}
 			System.out.println();
 		}
@@ -136,7 +177,10 @@ public class kanon
 			{
 				// No need to compute DP for those lower than value of kanonymity
 				if (j < anonymity - 1)
+				{
 					dpTable[j][i] = -1;
+					setTable[j][i] = new ArrayList<ArrayList<Dataset>>();
+				}
 				else
 				{
 					if (i == 0) // C(i, 1)
@@ -149,27 +193,59 @@ public class kanon
 						int median = medianOfDataset(tempSet);
 						// Get the minimal change of the dataset
 						dpTable[j][i] = changeOfDataset(tempSet, median);
+						// Store the set into set table
+						setTable[j][i] = new ArrayList<ArrayList<Dataset>>();
+						setTable[j][i].add(tempSet);
 					}
 					else // C(i, 2) or C(i, 3)
 					{
-						if (j + 1 < (anonymity * 2)) 			// no of element smaller than double of k-anonymity
-							dpTable[j][i] = dpTable[j][i - 1];  // just equal to last calculation
+						// No of element smaller than double of k-anonymity
+						if (j + 1 < (anonymity * 2))
+						{
+							// Just equal to last calculation
+							dpTable[j][i] = dpTable[j][i - 1];  
+							setTable[j][i] = setTable[j][i - 1];
+						}
 						else
 						{
 							ArrayList<Integer> tempSet = new ArrayList<Integer>();
-							// put all elements into all previous set
+							// 3D arraylist to store all dynamic programming done
+							ArrayList<ArrayList<ArrayList<Dataset>>> tempSetTable = new ArrayList<ArrayList<ArrayList<Dataset>>>();
+							
+							// Put all elements into all previous set
 							tempSet.add(dpTable[j][i - 1]);
-							// consider all possibilities that can split sets
+							tempSetTable.add(setTable[j][i - 1]);
+							
+							// Consider all possibilities that can split sets
 							for (int k = anonymity; k <= j + 1 - anonymity; k++)
 							{
 								ArrayList<Dataset> temp = new ArrayList<Dataset>();
-								for (int l = k; l < j + 1; l++)
+								for (int l = k; l <= j; l++)
 									temp.add(d.get(l));
 								// C(i - ?, 1) + A(i - ?)
 								tempSet.add(dpTable[k - 1][i - 1] + changeOfDataset(temp, medianOfDataset(temp)));
+								
+								// Deep copy for the current dynamic programming set
+								ArrayList<ArrayList<Dataset>> t = new ArrayList<ArrayList<Dataset>>();
+								for (int m = 0; m < setTable[k - 1][i - 1].size(); m++)
+								{
+									ArrayList<Dataset> ds = setTable[k - 1][i - 1].get(m);
+									ArrayList<Dataset> nds = new ArrayList<Dataset>();
+									for (Dataset copy : ds)
+										nds.add(copy);
+									t.add(nds);
+								}
+								t.add(temp);
+								tempSetTable.add(t);
 							}
-							// calculate minimum change of the set of dataset
+							
+							// Get the minimum change of the set of datasets
 							dpTable[j][i] = min(tempSet);
+							
+							// Find out the minimum datasets
+							for (int m = 0; m < tempSet.size(); m++)
+								if (tempSet.get(m) == dpTable[j][i])
+									setTable[j][i] = tempSetTable.get(m);
 						}
 					}
 				}
@@ -177,11 +253,73 @@ public class kanon
 		}
 	}
 	
+	private void printInput()
+	{
+		for (Dataset print : input)
+			System.out.println(print);
+	}
+	
+	private void outputToFile(String filename)
+	{
+		ArrayList<ArrayList<Dataset>> finalSet = setTable[setTable.length - 1][setTable[0].length - 1];
+		// Changing subset by subset
+		for (ArrayList<Dataset> subset : finalSet)
+		{
+			int noOfElementToChange = subset.size();
+			int median = medianOfDataset(subset);
+			// search through input to swap with median
+			for (Dataset change : input)
+			{
+				if (noOfElementToChange == 0)
+					break;
+				else
+				{
+					for (Dataset elements : subset)
+					{
+						if (elements.getQID() == change.getQID())
+						{
+							change.setQID(median);
+							noOfElementToChange--;
+							break;
+						}
+					}
+				}
+			}
+		}
+		// overwrite the whole file
+		File file = new File(filename);
+		try
+		(
+			PrintWriter writer = new PrintWriter(file);
+		)
+		{
+			for (Dataset write : input)
+			{
+				writer.print(write);
+				if (write != input.get(input.size() - 1))
+				{
+					writer.print("\n");
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			System.out.println(e.getMessage());
+		}
+	}
+	
 	public static void main(String[] args)
 	{
 		kanon dataset = new kanon(args[0], 4);
+		dataset.printInput();
 		ArrayList<Dataset> clonedSet = dataset.cloneAndSort();
+		//for (Dataset print : clonedSet)
+		//	System.out.println(print);
 		dataset.constructDPTable(clonedSet, 4);
 		dataset.printDPTable();
+		dataset.printSetTable();
+		dataset.outputToFile(args[0]);
+		System.out.println("Data After: ");
+		dataset.printInput();
 	}
 }
